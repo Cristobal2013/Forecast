@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard LATAM 2026</title>
+    
+    <!-- TAILWIND CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0f172a', 
+                        darkpanel: '#1e293b',
+                        darkpanel2: '#334155',
+                        accent: '#3b82f6',
+                        muted: '#94a3b8',
+                        border: 'rgba(255,255,255,0.1)'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- LIBRERÍAS -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types/prop-types.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.12.0/umd/Recharts.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease, color 0.3s ease; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .sort-icon { display: inline-block; transition: transform 0.2s; }
+        .sort-asc { transform: rotate(180deg); }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-darkbg dark:text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useRef, useEffect } = React;
+        const { AreaChart, ComposedChart, BarChart, Line, Bar, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ReferenceLine } = Recharts;
+
+        // --- ICONOS ---
+        const Icon = ({ path, className="w-5 h-5", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Upload: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></g>,
+            Sun: <g><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></g>,
+            Moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>,
+            Dashboard: <g><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></g>,
+            Users: <g><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></g>,
+            Briefcase: <g><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></g>,
+            Clock: <g><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></g>,
+            Dollar: <g><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></g>,
+            Filter: <g><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></g>,
+            ChartPie: <g><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></g>,
+            TrendingUp: <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>,
+            Flag: <g><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></g>,
+            List: <g><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></g>,
+            AlertTriangle: <g><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></g>,
+            Search: <g><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></g>,
+            Download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></g>,
+            ChevronDown: <polyline points="6 9 12 15 18 9"/>
+        };
+
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+        // --- COMPONENTS ---
+        const KpiCard = ({ title, value, subtext, icon, colorClass, onClick, active }) => (
+            <div 
+                onClick={onClick}
+                className={`kpi-card relative overflow-hidden bg-white dark:bg-darkpanel p-6 rounded-2xl border transition-all duration-200 cursor-pointer group ${active ? 'border-blue-500 ring-1 ring-blue-500 dark:ring-blue-400' : 'border-slate-200 dark:border-border hover:border-blue-300 dark:hover:border-blue-700'}`}
+            >
+                <div className="flex justify-between items-start mb-3 relative z-10">
+                    <div>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium tracking-wide uppercase">{title}</p>
+                        <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1 tracking-tight">{value}</h3>
+                    </div>
+                    <div className={`p-3 rounded-xl ${colorClass} bg-opacity-10 dark:bg-opacity-20 text-opacity-100 group-hover:scale-110 transition-transform`}>
+                        {icon}
+                    </div>
+                </div>
+                <p className="text-xs text-slate-400 font-medium relative z-10 flex items-center gap-1">
+                    {subtext}
+                </p>
+                {/* Decorative background element */}
+                <div className={`absolute -bottom-4 -right-4 w-24 h-24 rounded-full opacity-5 ${colorClass.replace('text-', 'bg-')}`}></div>
+            </div>
+        );
+
+        const Heatmap = ({ data, groupBy }) => {
+            const matrix = useMemo(() => {
+                const map = {};
+                const entities = new Set();
+                data.forEach(d => {
+                    const key = groupBy === 'manager' ? d.manager : d.person;
+                    if (!key || key === 'Unknown' || key === 'Unassigned') return;
+                    entities.add(key);
+                    if (!map[key]) map[key] = {};
+                    map[key][d.month] = (map[key][d.month] || 0) + d.hours;
+                });
+                return { rows: Array.from(entities).sort(), values: map };
+            }, [data, groupBy]);
+
+            const getColor = (val) => {
+                if (!val) return "bg-slate-50 dark:bg-slate-800/30 text-slate-300 dark:text-slate-700";
+                if (val > 160) return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-800 font-bold";
+                if (val > 120) return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-medium";
+                return "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800";
+            };
+
+            return (
+                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-border bg-white dark:bg-darkpanel shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 dark:bg-darkpanel2 border-b border-slate-200 dark:border-border">
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs sticky left-0 bg-slate-50 dark:bg-darkpanel2 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                            {groupBy === 'manager' ? 'Manager' : 'Persona'}
+                                    </th>
+                                    {MONTHS.map(m => (
+                                        <th key={m} className="px-1 py-3 text-center w-16 font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs border-l border-slate-100 dark:border-border">
+                                            {m}
+                                        </th>
+                                    ))}
+                                    <th className="px-4 py-3 text-center font-semibold text-slate-500 dark:text-slate-400 uppercase text-xs bg-slate-100 dark:bg-darkpanel2/50 border-l border-slate-200 dark:border-border">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-border">
+                                {matrix.rows.map(entity => {
+                                    const rowTotal = MONTHS.reduce((acc, m) => acc + (matrix.values[entity][m] || 0), 0);
+                                    return (
+                                        <tr key={entity} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
+                                            <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-300 sticky left-0 bg-white dark:bg-darkpanel z-10 border-r border-slate-100 dark:border-border whitespace-nowrap shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:bg-slate-50 dark:group-hover:bg-darkpanel">
+                                                {entity}
+                                            </td>
+                                            {MONTHS.map(m => (
+                                                <td key={m} className="p-1 border-l border-slate-100 dark:border-border">
+                                                    <div className={`text-center py-1.5 rounded-md text-xs transition-all ${getColor(matrix.values[entity][m])}`}>
+                                                        {matrix.values[entity][m] ? Math.round(matrix.values[entity][m]) : '-'}
+                                                    </div>
+                                                </td>
+                                            ))}
+                                            <td className="px-2 py-2 text-center font-bold text-slate-800 dark:text-white bg-slate-50 dark:bg-darkpanel2/30 border-l border-slate-200 dark:border-border">
+                                                {Math.round(rowTotal)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const DetailTable = ({ data, filterMode }) => {
+            const [sortConfig, setSortConfig] = useState({ key: 'totalHours', direction: 'desc' });
+
+            const projectData = useMemo(() => {
+                const projects = {};
+                
+                data.forEach(d => {
+                    const key = `${d.project}-${d.person}`; 
+                    if(!projects[key]) {
+                        projects[key] = {
+                            project: d.project || 'Unknown Project',
+                            person: d.person,
+                            manager: d.manager,
+                            state: d.state,
+                            totalHours: 0,
+                            totalForecastValue: 0,
+                            bookingValue: d.bookingValue || 0,
+                            budgetedHours: d.budgetedHours || 0,
+                            billableHours: d.billableHours || 0,
+                            contractedRemaining: d.contractedRemaining || 0,
+                        };
+                    }
+                    projects[key].totalHours += d.hours;
+                    projects[key].totalForecastValue += d.value;
+                    projects[key].bookingValue = Math.max(projects[key].bookingValue, d.bookingValue || 0);
+                    projects[key].budgetedHours = Math.max(projects[key].budgetedHours, d.budgetedHours || 0);
+                    projects[key].billableHours = Math.max(projects[key].billableHours, d.billableHours || 0);
+                });
+
+                let result = Object.values(projects);
+
+                if (filterMode === 'overbudget') {
+                    result = result.filter(p => {
+                        const budget = p.budgetedHours > 0 ? p.budgetedHours : 0;
+                        const executed = p.billableHours > 0 ? p.billableHours : p.totalHours;
+                        return budget > 0 && executed > budget;
+                    });
+                }
+
+                // SORTING LOGIC
+                result.sort((a, b) => {
+                    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                return result;
+            }, [data, filterMode, sortConfig]);
+
+            const requestSort = (key) => {
+                let direction = 'desc';
+                if (sortConfig.key === key && sortConfig.direction === 'desc') {
+                    direction = 'asc';
+                }
+                setSortConfig({ key, direction });
+            };
+
+            const SortHeader = ({ label, sortKey, align = 'left' }) => (
+                <th 
+                    className={`px-4 py-3 text-${align} font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 select-none group transition-colors`}
+                    onClick={() => requestSort(sortKey)}
+                >
+                    <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'}`}>
+                        {label}
+                        <span className={`transition-opacity ${sortConfig.key === sortKey ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}>
+                            <Icon path={Icons.ChevronDown} className={`w-3 h-3 transition-transform ${sortConfig.key === sortKey && sortConfig.direction === 'asc' ? 'rotate-180' : ''}`} />
+                        </span>
+                    </div>
+                </th>
+            );
+
+            return (
+                <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-border bg-white dark:bg-darkpanel shadow-sm animate-fade-in flex flex-col h-full">
+                    <div className="p-4 border-b border-slate-200 dark:border-border bg-slate-50 dark:bg-darkpanel2/50 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                                <Icon path={Icons.List} className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-700 dark:text-slate-200">Detalle Operativo</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Desglose por proyecto y recurso</p>
+                            </div>
+                        </div>
+                        <span className="px-3 py-1 bg-white dark:bg-darkpanel rounded-full text-xs font-medium border border-slate-200 dark:border-border text-slate-600 dark:text-slate-300 shadow-sm">
+                            {projectData.length} Registros
+                        </span>
+                    </div>
+                    <div className="overflow-auto flex-1">
+                        <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-slate-100 dark:bg-darkpanel2 z-10 shadow-sm">
+                                <tr>
+                                    <SortHeader label="Proyecto" sortKey="project" />
+                                    <SortHeader label="Persona" sortKey="person" />
+                                    <th className="px-4 py-3 text-center font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase">Estado</th>
+                                    <SortHeader label="Budget (H)" sortKey="budgetedHours" align="right" />
+                                    <SortHeader label="Billable (H)" sortKey="billableHours" align="right" />
+                                    <SortHeader label="Booking (USD)" sortKey="bookingValue" align="right" />
+                                    <SortHeader label="Forecast (USD)" sortKey="totalForecastValue" align="right" />
+                                    <th className="px-4 py-3 text-center font-semibold text-slate-500 dark:text-slate-400 text-xs uppercase">Avance</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-border">
+                                {projectData.map((p, idx) => {
+                                    const budget = p.budgetedHours > 0 ? p.budgetedHours : 0; 
+                                    const executed = p.billableHours > 0 ? p.billableHours : p.totalHours; 
+                                    const progress = budget > 0 ? Math.min(100, (executed / budget) * 100) : 0;
+                                    const isOver = budget > 0 && executed > budget;
+
+                                    return (
+                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+                                            <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                                                <div className="flex flex-col">
+                                                    <span className="truncate max-w-[180px]" title={p.project}>{p.project}</span>
+                                                    {isOver && <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider mt-0.5">Overbudget</span>}
+                                                </div>
+                                            </td>
+                                            <td className={`px-4 py-3 ${p.person === 'Unassigned' ? 'text-slate-400 italic' : 'text-slate-600 dark:text-slate-400'}`}>{p.person}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                                                    p.state === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800' :
+                                                    p.state === 'Closed' ? 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' :
+                                                    'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'
+                                                }`}>
+                                                    {p.state}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-700 dark:text-slate-300">{Math.round(budget)}</td>
+                                            <td className={`px-4 py-3 text-right font-mono font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>{Math.round(executed)}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-emerald-600 dark:text-emerald-400 text-xs">USD {Math.round(p.bookingValue).toLocaleString()}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-slate-600 dark:text-slate-400 text-xs">USD {Math.round(p.totalForecastValue).toLocaleString()}</td>
+                                            <td className="px-4 py-3 align-middle">
+                                                <div className="w-full max-w-[100px] mx-auto h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-500 ${isOver ? 'bg-red-500' : progress > 80 ? 'bg-amber-500' : 'bg-blue-500'}`} 
+                                                        style={{ width: `${progress}%` }}
+                                                    ></div>
+                                                </div>
+                                                <div className="text-[10px] text-center mt-1 text-slate-400">{Math.round(progress)}%</div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                        {projectData.length === 0 && (
+                            <div className="p-8 text-center text-slate-400">
+                                <p>No se encontraron datos que coincidan con los filtros.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const FinancialView = ({ data, darkMode }) => {
+            const financialData = useMemo(() => {
+                const monthly = {};
+                const byType = {};
+                
+                MONTHS.forEach(m => monthly[m] = { month: m });
+
+                data.forEach(d => {
+                    const type = d.billingType || 'Other';
+                    if (!monthly[d.month][type]) monthly[d.month][type] = 0;
+                    monthly[d.month][type] += d.value;
+                    byType[type] = (byType[type] || 0) + d.value;
+                });
+
+                const chartData = Object.values(monthly).map(m => {
+                    Object.keys(byType).forEach(t => { if(!m[t]) m[t] = 0; });
+                    return m;
+                });
+
+                const pieData = Object.entries(byType)
+                    .map(([name, value]) => ({ name, value }))
+                    .sort((a,b) => b.value - a.value);
+
+                return { chartData, pieData, types: Object.keys(byType) };
+            }, [data]);
+
+            return (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-white dark:bg-darkpanel p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-border h-[420px] flex flex-col">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+                                <span className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded text-emerald-600 dark:text-emerald-400">
+                                    <Icon path={Icons.TrendingUp} className="w-4 h-4" /> 
+                                </span>
+                                Tendencia de Facturación Mensual
+                            </h3>
+                            <div className="flex-1 w-full min-h-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={financialData.chartData} margin={{top: 10, right: 10, left: 0, bottom: 0}}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} tickFormatter={(val) => `USD ${val/1000}k`} />
+                                        <Tooltip 
+                                            cursor={{fill: darkMode ? '#334155' : '#f1f5f9', opacity: 0.4}}
+                                            contentStyle={{backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', color: darkMode ? '#f8fafc' : '#0f172a', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}} 
+                                            formatter={(value) => [`USD ${Math.round(value).toLocaleString()}`, '']}
+                                        />
+                                        <Legend wrapperStyle={{paddingTop: '20px'}} />
+                                        {financialData.types.map((type, idx) => (
+                                            <Bar key={type} dataKey={type} stackId="a" fill={COLORS[idx % COLORS.length]} radius={idx === financialData.types.length - 1 ? [4, 4, 0, 0] : [0,0,0,0]} />
+                                        ))}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="bg-white dark:bg-darkpanel p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-border h-[420px] flex flex-col">
+                            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
+                                <span className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded text-purple-600 dark:text-purple-400">
+                                    <Icon path={Icons.ChartPie} className="w-4 h-4" /> 
+                                </span>
+                                Composición de Ingresos
+                            </h3>
+                            <div className="flex-1 w-full min-h-0 relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={financialData.pieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={70}
+                                            outerRadius={100}
+                                            paddingAngle={2}
+                                            dataKey="value"
+                                        >
+                                            {financialData.pieData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke={darkMode ? '#1e293b' : '#fff'} strokeWidth={2} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value) => `USD ${Math.round(value).toLocaleString()}`} contentStyle={{borderRadius: '8px'}} />
+                                        <Legend verticalAlign="bottom" height={36}/>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="text-center">
+                                        <p className="text-xs text-slate-400 uppercase font-semibold">Total</p>
+                                        <p className="text-lg font-bold text-slate-800 dark:text-white">
+                                            USD {(financialData.pieData.reduce((a,b)=>a+b.value,0)/1000000).toFixed(1)}M
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP ---
+        const DashboardApp = () => {
+            const [data, setData] = useState([]);
+            const [activeTab, setActiveTab] = useState('overview');
+            const [darkMode, setDarkMode] = useState(true);
+            const [groupBy, setGroupBy] = useState('person');
+            const fileInputRef = useRef(null);
+            
+            // Filters
+            const [selectedManager, setSelectedManager] = useState('All');
+            const [selectedPerson, setSelectedPerson] = useState('All');
+            const [selectedState, setSelectedState] = useState('All');
+            const [searchText, setSearchText] = useState('');
+            const [detailFilter, setDetailFilter] = useState(null); // 'overbudget' | null
+            const [selectedMonthKPI, setSelectedMonthKPI] = useState('Jan');
+
+            useEffect(() => {
+                if(darkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [darkMode]);
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const bstr = evt.target.result;
+                        const wb = XLSX.read(bstr, { type: 'binary' });
+                        
+                        let targetSheetName = null;
+                        let targetRawData = null;
+                        let headerIndex = -1;
+
+                        for(let sheetName of wb.SheetNames) {
+                            const ws = wb.Sheets[sheetName];
+                            const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                            
+                            for(let i=0; i<Math.min(50, rawData.length); i++) {
+                                const row = rawData[i] || [];
+                                const rowStr = JSON.stringify(row).toLowerCase();
+                                if(rowStr.includes('project owner') || rowStr.includes('project name')) {
+                                    targetSheetName = sheetName;
+                                    targetRawData = rawData;
+                                    headerIndex = i;
+                                    break;
+                                }
+                            }
+                            if(targetSheetName) break; 
+                        }
+
+                        if (!targetSheetName) {
+                            alert("No se detectó una estructura compatible (Headers esperados: Project Name, Manager, etc.)");
+                            return;
+                        }
+
+                        const headers = targetRawData[headerIndex].map(h => String(h || '').trim());
+                        
+                        // Smart Column Mapping with PRIORITY and EXCLUSION
+                        // Returns index of first keyword that matches a header, validating exclusions
+                        const getIdx = (keywords, exclude = []) => {
+                            for (let k of keywords) {
+                                const idx = headers.findIndex(h => {
+                                    const lowerH = h.toLowerCase();
+                                    return lowerH.includes(k) && !exclude.some(ex => lowerH.includes(ex));
+                                });
+                                if (idx > -1) return idx;
+                            }
+                            return -1;
+                        };
+                        
+                        // 1. MANAGER
+                        // Buscamos columnas de Manager explícitas
+                        let idxManager = getIdx(['people manager', 'resource manager', 'reporting manager', 'supervisor', 'manager name', 'manager'], ['project manager']);
+
+                        // 2. PERSONA / EMPLEADO (Project Owner)
+                        // Buscamos columnas de Empleado, EXCLUYENDO explícitamente palabras de "Manager" para no confundirse
+                        let idxPerson = getIdx(
+                            ['project owner', 'resource name', 'employee name', 'staff name', 'consultant', 'owner', 'resource', 'employee', 'staff', 'full name', 'nombre', 'apellido', 'user'], 
+                            ['manager', 'supervisor', 'approver']
+                        );
+                        
+                        // Fallback para Persona: Si no encuentra nada, busca "Name" genérico que no sea Project Name ni Manager
+                        if (idxPerson === -1) {
+                            idxPerson = headers.findIndex(h => {
+                                const l = h.toLowerCase();
+                                return (l.includes('name') || l.includes('nombre')) && !l.includes('project') && !l.includes('manager') && !l.includes('file');
+                            });
+                        }
+                        
+                        let idxBilling = getIdx(['billing type', 'billability']);
+                        let idxState = getIdx(['project state', 'status', 'state']);
+                        let idxProject = getIdx(['project name', 'project title', 'project']);
+                        
+                        let idxBudgeted = getIdx(['budgeted hours', 'budget']);
+                        let idxBillable = getIdx(['billable hours', 'billable']);
+                        let idxContracted = getIdx(['contracted hours remaining', 'remaining']);
+                        let idxBooking = getIdx(['booking value (converted)', 'booking value', 'total value']);
+
+                        if (idxPerson === -1 && idxProject === -1) {
+                            alert("No se pudieron identificar columnas clave (Persona o Proyecto).");
+                            return;
+                        }
+
+                        // FIXED: Reverted to .includes() for broad matching (e.g. "Mar26", "Feb-26")
+                        // BUT added explicit blacklist for collision words (Summary, Margin, Remarks)
+                        const monthConfigs = MONTHS.map(m => {
+                            const isMatch = (h, checkForMoney) => {
+                                const lowerH = h.toLowerCase();
+                                const monthLower = m.toLowerCase();
+                                
+                                // 1. Must contain the month string (e.g., "mar")
+                                if (!lowerH.includes(monthLower)) return false;
+
+                                // 2. Must NOT contain "alloc"
+                                if (lowerH.includes('alloc')) return false;
+
+                                // 3. Money check
+                                if (checkForMoney && !h.includes('$')) return false;
+                                if (!checkForMoney && h.includes('$')) return false;
+
+                                // 4. EXPLICIT BLACKLIST for "Mar" collisions (Summary, Margin, Remarks, Market)
+                                const blacklist = ['summary', 'margin', 'remark', 'market', 'approval', 'payment'];
+                                if (blacklist.some(bad => lowerH.includes(bad))) return false;
+
+                                return true;
+                            };
+
+                            const hIdx = headers.findIndex(h => isMatch(h, false)); // Find Hours (no $)
+                            const vIdx = headers.findIndex(h => isMatch(h, true));  // Find Value (with $)
+                            
+                            return { name: m, hIdx, vIdx };
+                        });
+
+                        const newData = [];
+                        for(let i = headerIndex + 1; i < targetRawData.length; i++) {
+                            const row = targetRawData[i];
+                            if(!row) continue;
+
+                            const person = idxPerson > -1 && row[idxPerson] ? String(row[idxPerson]).trim() : "Unassigned";
+                            const manager = idxManager > -1 && row[idxManager] ? String(row[idxManager]).trim() : "Unassigned";
+                            const billingType = idxBilling > -1 ? row[idxBilling] : "Other";
+                            const state = idxState > -1 ? (row[idxState] || "Active") : "Active";
+                            const project = idxProject > -1 ? (row[idxProject] || "Untitled Project") : "Untitled Project";
+                            
+                            const budgetedHours = idxBudgeted > -1 ? (parseFloat(row[idxBudgeted]) || 0) : 0;
+                            const billableHours = idxBillable > -1 ? (parseFloat(row[idxBillable]) || 0) : 0;
+                            const contractedRemaining = idxContracted > -1 ? (parseFloat(row[idxContracted]) || 0) : 0;
+                            const bookingValue = idxBooking > -1 ? (parseFloat(row[idxBooking]) || 0) : 0;
+
+                            if ((!person || person === '0') && (!project || project === '0')) continue;
+
+                            monthConfigs.forEach(config => {
+                                let hours = 0;
+                                let value = 0;
+                                if (config.hIdx > -1) {
+                                    hours = parseFloat(row[config.hIdx]) || 0;
+                                }
+                                if (config.vIdx > -1) {
+                                    let rawV = row[config.vIdx];
+                                    if (typeof rawV === 'string') rawV = rawV.replace(/[^0-9.-]/g, '');
+                                    value = parseFloat(rawV) || 0;
+                                }
+                                
+                                newData.push({ 
+                                    person, manager, billingType: String(billingType), state: String(state), project: String(project),
+                                    budgetedHours, billableHours, contractedRemaining, bookingValue,
+                                    month: config.name, hours, value 
+                                });
+                            });
+                        }
+
+                        if(newData.length > 0) {
+                            setData(newData);
+                        } else {
+                            alert("Archivo procesado pero sin datos válidos.");
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert("Error al procesar el archivo.");
+                    }
+                };
+                reader.readAsBinaryString(file);
+                // Clear input to allow re-uploading the same file
+                e.target.value = '';
+            };
+
+            // Global Filter Logic
+            const filteredData = useMemo(() => {
+                let d = data;
+                if (selectedManager !== 'All') d = d.filter(item => item.manager === selectedManager);
+                if (selectedPerson !== 'All') d = d.filter(item => item.person === selectedPerson);
+                if (selectedState !== 'All') d = d.filter(item => item.state === selectedState);
+                if (searchText) {
+                    const lowerSearch = searchText.toLowerCase();
+                    d = d.filter(item => 
+                        (item.person && item.person.toLowerCase().includes(lowerSearch)) || 
+                        (item.project && item.project.toLowerCase().includes(lowerSearch))
+                    );
+                }
+                return d;
+            }, [data, selectedManager, selectedPerson, selectedState, searchText]);
+
+            // KPI Utilization Data
+            const utilizationData = useMemo(() => {
+                const dataByPerson = {};
+                filteredData.forEach(d => {
+                    if (d.month === selectedMonthKPI) {
+                        dataByPerson[d.person] = (dataByPerson[d.person] || 0) + d.hours;
+                    }
+                });
+                
+                return Object.entries(dataByPerson)
+                    .map(([name, hours]) => ({
+                        name,
+                        hours,
+                        status: hours > 170 ? 'Overload' : hours < 140 ? 'Underutilized' : 'Optimal'
+                    }))
+                    .sort((a,b) => b.hours - a.hours);
+            }, [filteredData, selectedMonthKPI]);
+
+            // Lists for dropdowns
+            const managersList = useMemo(() => ['All', ...new Set(data.map(d => d.manager).filter(Boolean).sort())], [data]);
+            const personsList = useMemo(() => {
+                let d = data;
+                if(selectedManager !== 'All') d = d.filter(item => item.manager === selectedManager);
+                return ['All', ...new Set(d.map(item => item.person).filter(Boolean).sort())];
+            }, [data, selectedManager]);
+            
+            const statesList = useMemo(() => ['All', ...new Set(data.map(d => d.state).filter(Boolean))], [data]);
+
+            // KPI Calculation
+            const kpis = useMemo(() => {
+                const totalHours = filteredData.reduce((s, x) => s + x.hours, 0);
+                const totalValue = filteredData.reduce((s, x) => s + x.value, 0);
+                const byPerson = {};
+                const byMgr = {};
+                const overBudgetProjects = new Set();
+                const processedProjects = new Set(); 
+
+                filteredData.forEach(d => { 
+                    byPerson[d.person] = (byPerson[d.person]||0) + d.hours;
+                    byMgr[d.manager] = (byMgr[d.manager]||0) + d.hours;
+                    
+                    const key = `${d.project}-${d.person}`;
+                    if (!processedProjects.has(key)) {
+                        processedProjects.add(key);
+                        if (d.billableHours > d.budgetedHours && d.budgetedHours > 0) {
+                            overBudgetProjects.add(key);
+                        }
+                    }
+                });
+                
+                const topP = Object.entries(byPerson).sort((a,b)=>b[1]-a[1])[0] || ['-', 0];
+                const topM = Object.entries(byMgr).sort((a,b)=>b[1]-a[1])[0] || ['-', 0];
+                
+                return { totalHours, totalValue, topP, topM, overBudgetCount: overBudgetProjects.size };
+            }, [filteredData]);
+
+            const chartData = useMemo(() => {
+                const map = {};
+                MONTHS.forEach(m => map[m] = { month: m, hours: 0, value: 0 });
+                filteredData.forEach(d => { if(map[d.month]) { map[d.month].hours += d.hours; map[d.month].value += d.value; } });
+                return Object.values(map);
+            }, [filteredData]);
+
+            // Handlers
+            const handleKpiClick = (type) => {
+                setDetailFilter(type === 'overbudget' ? 'overbudget' : null);
+                if (type === 'topContributor' && kpis.topP[0] !== '-') setSelectedPerson(kpis.topP[0]);
+                if (type === 'topManager' && kpis.topM[0] !== '-') setSelectedManager(kpis.topM[0]);
+                setActiveTab('detail');
+            };
+
+            const handleExport = () => {
+                if(filteredData.length === 0) return;
+                const ws = XLSX.utils.json_to_sheet(filteredData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Datos Exportados");
+                XLSX.writeFile(wb, "Dashboard_Export.xlsx");
+            };
+
+            const hasData = data.length > 0;
+
+            return (
+                <div className="min-h-screen p-4 md:p-6 bg-slate-100 dark:bg-darkbg transition-colors duration-300">
+                    <div className="max-w-[1400px] mx-auto space-y-6">
+                        
+                        {/* HEADER & CONTROLS */}
+                        <header className="flex flex-col xl:flex-row justify-between gap-4 bg-white dark:bg-darkpanel p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-border">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-500/30">
+                                    <Icon path={Icons.Dashboard} className="w-6 h-6"/>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-900 dark:text-white">Executive Dashboard </h1>
+                                    <p className="text-slate-500 dark:text-slate-400 text-sm">Professional Services</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/* Search */}
+                                <div className="relative group">
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                                        <Icon path={Icons.Search} className="w-4 h-4"/>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar persona o proyecto..." 
+                                        value={searchText}
+                                        onChange={(e) => setSearchText(e.target.value)}
+                                        className="pl-9 pr-4 py-2 bg-slate-50 dark:bg-darkpanel2 border border-slate-200 dark:border-slate-600 rounded-xl text-sm w-48 focus:w-64 transition-all focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-white"
+                                    />
+                                </div>
+
+                                {/* Filters */}
+                                <div className="flex items-center bg-slate-50 dark:bg-darkpanel2 p-1 rounded-xl border border-slate-200 dark:border-slate-600">
+                                    <select value={selectedManager} onChange={(e) => { setSelectedManager(e.target.value); setSelectedPerson('All'); }} className="bg-transparent text-sm font-medium text-slate-600 dark:text-slate-300 border-none focus:ring-0 cursor-pointer outline-none px-3 py-1.5 hover:text-blue-600">
+                                        <option value="All">Todos los Managers</option>
+                                        {managersList.filter(m => m !== 'All').map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+                                    <select value={selectedPerson} onChange={(e) => setSelectedPerson(e.target.value)} className="bg-transparent text-sm font-medium text-slate-600 dark:text-slate-300 border-none focus:ring-0 cursor-pointer outline-none px-3 py-1.5 hover:text-blue-600">
+                                        <option value="All">Todo el Personal</option>
+                                        {personsList.filter(p => p !== 'All').map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+
+                                {/* Actions */}
+                                <button onClick={handleExport} disabled={!hasData} className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-darkpanel2 dark:text-slate-400 transition-colors" title="Exportar a Excel">
+                                    <Icon path={Icons.Download} />
+                                </button>
+                                <button onClick={() => setDarkMode(!darkMode)} className="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-darkpanel2 dark:text-yellow-400 transition-colors">
+                                    <Icon path={darkMode ? Icons.Sun : Icons.Moon} />
+                                </button>
+                                
+                                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv" />
+                                <button onClick={() => fileInputRef.current.click()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/20 active:scale-95 transition-all">
+                                    <Icon path={Icons.Upload} className="w-4 h-4"/> Importar
+                                </button>
+                            </div>
+                        </header>
+
+                        {/* EMPTY STATE */}
+                        {!hasData && (
+                            <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-darkpanel rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
+                                <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-full mb-4">
+                                    <Icon path={Icons.Upload} className="w-10 h-10 text-blue-500" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Comienza subiendo tus datos</h2>
+                                <p className="text-slate-500 dark:text-slate-400 max-w-md text-center mb-6">Importa un archivo Excel (.xlsx) con columnas de Project Name, Manager, y horas mensuales para visualizar el dashboard.</p>
+                                <button onClick={() => fileInputRef.current.click()} className="text-blue-600 font-semibold hover:underline">Seleccionar archivo local</button>
+                            </div>
+                        )}
+
+                        {hasData && (
+                            <>
+                                {/* KPIS */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 animate-fade-in">
+                                    <KpiCard 
+                                        title="Total Horas" 
+                                        value={Math.round(kpis.totalHours).toLocaleString()} 
+                                        subtext="Forecast 2026" 
+                                        icon={<Icon path={Icons.Clock}/>} 
+                                        colorClass="text-blue-500 bg-blue-500" 
+                                        onClick={() => handleKpiClick('totalHours')}
+                                    />
+                                    <KpiCard 
+                                        title="Revenue Estimado" 
+                                        value={`USD ${Math.round(kpis.totalValue).toLocaleString()}`} 
+                                        subtext="Total Value" 
+                                        icon={<Icon path={Icons.Dollar}/>} 
+                                        colorClass="text-emerald-500 bg-emerald-500" 
+                                        onClick={() => handleKpiClick('revenue')}
+                                    />
+                                    <KpiCard 
+                                        title="Top Contributor" 
+                                        value={kpis.topP[0]} 
+                                        subtext={`${Math.round(kpis.topP[1])}h asignadas`} 
+                                        icon={<Icon path={Icons.Users}/>} 
+                                        colorClass="text-purple-500 bg-purple-500" 
+                                        onClick={() => handleKpiClick('topContributor')}
+                                    />
+                                    <KpiCard 
+                                        title="Top Manager" 
+                                        value={kpis.topM[0]} 
+                                        subtext={`${Math.round(kpis.topM[1])}h gestionadas`} 
+                                        icon={<Icon path={Icons.Briefcase}/>} 
+                                        colorClass="text-amber-500 bg-amber-500"
+                                        onClick={() => handleKpiClick('topManager')}
+                                    />
+                                    <KpiCard 
+                                        title="Riesgo Presupuesto" 
+                                        value={kpis.overBudgetCount} 
+                                        subtext="Proyectos Excedidos" 
+                                        icon={<Icon path={Icons.AlertTriangle}/>} 
+                                        colorClass="text-red-500 bg-red-500" 
+                                        onClick={() => handleKpiClick('overbudget')}
+                                        active={detailFilter === 'overbudget'}
+                                    />
+                                </div>
+
+                                {/* TABS NAVIGATION */}
+                                <div className="border-b border-slate-200 dark:border-slate-700">
+                                    <nav className="flex gap-6 overflow-x-auto" aria-label="Tabs">
+                                        {['overview', 'detail', 'capacity', 'financials', 'kpi'].map(tab => (
+                                            <button 
+                                                key={tab} 
+                                                onClick={() => { setActiveTab(tab); setDetailFilter(null); }} 
+                                                className={`
+                                                    py-4 px-1 inline-flex items-center gap-2 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
+                                                    ${activeTab === tab 
+                                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400' 
+                                                        : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'}
+                                                `}
+                                            >
+                                                {tab === 'overview' && <Icon path={Icons.Dashboard} className="w-4 h-4"/>}
+                                                {tab === 'detail' && <Icon path={Icons.List} className="w-4 h-4"/>}
+                                                {tab === 'capacity' && <Icon path={Icons.Users} className="w-4 h-4"/>}
+                                                {tab === 'financials' && <Icon path={Icons.Dollar} className="w-4 h-4"/>}
+                                                {tab === 'kpi' && <Icon path={Icons.Flag} className="w-4 h-4"/>}
+                                                <span className="capitalize">
+                                                    {tab === 'overview' ? 'Vista General' : 
+                                                     tab === 'detail' ? 'Detalle Operativo' : 
+                                                     tab === 'capacity' ? 'Matriz Capacidad' : 
+                                                     tab === 'financials' ? 'Financiero' : 'KPI Utilización'}
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </nav>
+                                </div>
+
+                                {/* TAB CONTENT */}
+                                <div className="py-6">
+                                    {activeTab === 'overview' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                                            <div className="bg-white dark:bg-darkpanel p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-border h-[400px]">
+                                                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Evolución de Horas</h3>
+                                                <ResponsiveContainer width="100%" height="85%">
+                                                    <AreaChart data={chartData}>
+                                                        <defs>
+                                                            <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} dy={10} />
+                                                        <YAxis axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} />
+                                                        <Tooltip contentStyle={{backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', color: darkMode ? '#fff' : '#000', borderRadius: '8px'}} />
+                                                        <Area type="monotone" dataKey="hours" stroke="#3b82f6" fillOpacity={1} fill="url(#colorHours)" strokeWidth={3} />
+                                                    </AreaChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="bg-white dark:bg-darkpanel p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-border h-[400px]">
+                                                <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Evolución Financiera (USD)</h3>
+                                                <ResponsiveContainer width="100%" height="85%">
+                                                    <BarChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} dy={10} />
+                                                        <YAxis axisLine={false} tickLine={false} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} tickFormatter={(val) => `USD ${val/1000}k`} />
+                                                        <Tooltip contentStyle={{backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', color: darkMode ? '#fff' : '#000', borderRadius: '8px'}} formatter={(value) => `$${Math.round(value).toLocaleString()}`} />
+                                                        <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'detail' && (
+                                        <DetailTable data={filteredData} filterMode={detailFilter} />
+                                    )}
+
+                                    {activeTab === 'capacity' && (
+                                        <div className="space-y-4 animate-fade-in">
+                                            <div className="flex justify-between items-center bg-white dark:bg-darkpanel p-4 rounded-xl border border-slate-200 dark:border-border">
+                                                <h3 className="font-bold text-slate-800 dark:text-white">Mapa de Calor: Asignación de Recursos</h3>
+                                                <div className="flex items-center gap-2 bg-slate-100 dark:bg-darkpanel2 p-1 rounded-lg">
+                                                    {['person', 'manager'].map(g => (
+                                                        <button key={g} onClick={() => setGroupBy(g)} className={`px-3 py-1.5 rounded-md text-xs font-semibold uppercase transition-all ${groupBy === g ? 'bg-white dark:bg-darkpanel text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}>
+                                                            {g === 'person' ? 'Por Persona' : 'Por Manager'}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <Heatmap data={filteredData} groupBy={groupBy} />
+                                        </div>
+                                    )}
+
+                                    {activeTab === 'financials' && (
+                                        <FinancialView data={filteredData} darkMode={darkMode} />
+                                    )}
+
+                                    {activeTab === 'kpi' && (
+                                        <div className="space-y-6 animate-fade-in">
+                                            <div className="bg-white dark:bg-darkpanel p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-border">
+                                                <div className="flex justify-between items-center mb-6">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Análisis de Utilización Mensual</h3>
+                                                        <p className="text-sm text-slate-500 dark:text-slate-400">Carga de trabajo por recurso vs Capacidad (160h)</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex gap-2 text-xs font-medium">
+                                                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-red-500"></div> &gt; 170h</div>
+                                                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> 140h - 170h</div>
+                                                            <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full bg-amber-500"></div> &lt; 140h</div>
+                                                        </div>
+                                                        <select 
+                                                            value={selectedMonthKPI} 
+                                                            onChange={(e) => setSelectedMonthKPI(e.target.value)} 
+                                                            className="bg-slate-50 dark:bg-darkpanel2 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+                                                        >
+                                                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="h-[500px] w-full">
+                                                    {utilizationData.length > 0 ? (
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <BarChart
+                                                                data={utilizationData}
+                                                                layout="vertical"
+                                                                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                                                                barSize={20}
+                                                            >
+                                                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} stroke={darkMode ? "#334155" : "#e2e8f0"} />
+                                                                <XAxis type="number" domain={[0, 'dataMax + 20']} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 12}} />
+                                                                <YAxis dataKey="name" type="category" width={100} tick={{fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 11}} interval={0} />
+                                                                <Tooltip 
+                                                                    cursor={{fill: darkMode ? '#334155' : '#f1f5f9', opacity: 0.4}}
+                                                                    contentStyle={{backgroundColor: darkMode ? '#1e293b' : '#fff', borderColor: darkMode ? '#334155' : '#e2e8f0', color: darkMode ? '#fff' : '#000', borderRadius: '8px'}}
+                                                                />
+                                                                <ReferenceLine x={160} stroke="#ef4444" strokeDasharray="3 3" label={{ position: 'top',  value: '160h', fill: '#ef4444', fontSize: 10 }} />
+                                                                <Bar dataKey="hours">
+                                                                    {utilizationData.map((entry, index) => (
+                                                                        <Cell key={`cell-${index}`} fill={
+                                                                            entry.hours > 170 ? '#ef4444' : 
+                                                                            entry.hours >= 140 ? '#10b981' : 
+                                                                            '#f59e0b'
+                                                                        } radius={[0, 4, 4, 0]} />
+                                                                    ))}
+                                                                </Bar>
+                                                            </BarChart>
+                                                        </ResponsiveContainer>
+                                                    ) : (
+                                                        <div className="h-full flex items-center justify-center text-slate-400">
+                                                            No hay datos para mostrar en este mes.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                        
+                        <div className="text-center text-xs text-slate-400 pb-8">
+                            PS -LATAM
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DashboardApp />);
+    </script>
+</body>
+</html>
